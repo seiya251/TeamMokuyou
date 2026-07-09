@@ -23,8 +23,8 @@ int selectedCard = -1;
 
 //PImage img;
 PFont font;
-int fightState = 1;//戦闘画面の状態(1-初回の5枚ドロー,2-敵のターン,3プレイヤーのターン,4カード選択状態,5一枚ドロー,6ゲームオーバー)
-int allState; //全体の画面状態(1-タイトル画面,2-戦闘画面,3-拠点)　
+int fightState = 1;//戦闘画面の状態(1-初回の5枚ドロー,2-敵のターン,3プレイヤーのターン,4カード選択状態,5一枚ドロー,6ゲームオーバー,7-ロビーに戻るか確認画面)
+int allState; //全体の画面状態(1-タイトル画面,2-戦闘画面,3-拠点,4-ガチャ,41-ガチャ単発,42-ガチャ10連,5-ロビー)　
 int PL_HP =100;//プレイヤーのHP
 int PL_EP =100;//プレイヤーのエネルギー
 int PL_HP_MAX = 100;//プレイヤーのHP最大値
@@ -74,7 +74,7 @@ ArrayList<String> battleLog = new ArrayList<String>();
 void setup() {
   size(1250, 700);
   //img = loadImage("SJWARS_title_background.jpg");
-  allState = 3;
+  allState = 5;//テストのときに変更
   fightState = 1;//
   background(0);
   font =createFont("Meiryo", 30);
@@ -382,11 +382,23 @@ void draw() {
       if (fightState == 6) {
         addLog("やられてしまった....");
       }
+      if (fightState == 7) {
+        //ロビーに戻るか確認
+      }
     } else {
       fill(255, 0, 0);
       textSize(400);
       text("死", 400, 500);
     }
+  }
+  if ( allState == 5) {
+    background(0);
+    textSize(70);
+    text("ロビー", 100, 100);
+    textSize(40);
+    text("1キーで戦闘へ", 100, 150);
+    text("２キーでガチャへ", 100, 200);
+    text("3キーで倉庫へ", 100, 250);
   }
 }
 
@@ -457,6 +469,12 @@ void keyPressed() {
               addLog(allEnemy[EN_Num][enemyName]+"をスクラップにしてやった！");
               int get_scrap = int((random(int(allEnemy[EN_Num][scrap_min]), int(allEnemy[EN_Num][scrap_max])+1)));
               scrap = scrap + get_scrap;
+              if (PL_HP <= 20 || PL_EP <= 20) {
+                addLog("エネルギーが減ってきた！");
+                addLog("ロビーに一度戻りますか？");
+                addLog("はい：1　いいえ：0");
+                fightState = 7;
+              }
             }
             card.rest_durability--;
             if (card.rest_durability <= 0) {
@@ -465,7 +483,9 @@ void keyPressed() {
               deckCards.add(card);
             }
             handCards.remove(index);
-            fightState = 5;
+            if (fightState != 7) {
+              fightState = 5;
+            }
           } else {
             addLog("武器エネルギーが不足している！");
             addLog("プレイヤーはどうする？数字キーでカードを選択!");
@@ -523,6 +543,31 @@ void keyPressed() {
         }
       }
     }
+  }
+  if (fightState == 7) {
+    if ( key == '1') {
+      allState = 5;
+      fightState = 0;
+      return;
+    } else if (key == '0') {
+      fightState = 5;
+      return;
+    }
+  }
+  if (allState == 5) {
+    if (key == '1') {
+      resetBattle();
+      allState = 2;
+      fightState = 1;
+      return;
+    } else if (key  =='2') {
+      allState = 4;
+      return;
+    } else if ( key =='3') {
+      allState = 3;
+      return;
+    }
+    return;
   }
 }
 
@@ -645,3 +690,23 @@ void mouseWheel(MouseEvent event) {
 }
 
 //ここまでステート３です
+void resetBattle() {
+  // プレイヤー
+  PL_HP = PL_HP_MAX;
+  PL_EP = PL_EP_MAX;
+  PL_defend = 0;
+  PL_total_damage = 0;
+
+  // 敵
+  EN_HP = 0;
+  EN_HP_MAX = 0;
+  EN_Num = 0;
+
+  //手札をデッキに戻す
+  while (handCards.size() > 0) {
+    deckCards.add(handCards.remove(0));
+  }
+  battleLog.clear();
+  // 戦闘状態
+  fightState = 1;
+}
