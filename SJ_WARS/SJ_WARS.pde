@@ -71,6 +71,12 @@ ArrayList<typeDeckCards> handCards = new ArrayList<typeDeckCards>();
 
 ArrayList<String> battleLog = new ArrayList<String>();
 
+float timereset;
+float time;
+int gatya1;
+int[] gatya10= new int[10];
+float cardkosa;
+
 void setup() {
   size(1250, 700);
   //img = loadImage("SJWARS_title_background.jpg");
@@ -84,6 +90,9 @@ void setup() {
   addCards(2, 4);
   addCards(3, 4);
   addCards(4, 4);
+ 
+  timereset=0;
+  cardkosa=0;
 
   // ステート３のやつです
   souko = new Souko();
@@ -125,6 +134,61 @@ void draw() {
   //ここからステート３です
 
   //image(img,0,0,width,height);//仮で背景表示してません
+  if(allState==4){
+    time=frameCount*2-timereset;
+    background(5,10, 25);
+    fill(255,255,255,50);
+    rect(110,485,50,3);
+    rect(110,485,3,20);
+    rect(440,615,-3,-20);
+    rect(440,615,-50,-3);
+    
+    rect(810,485,50,3);
+    rect(810,485,3,20);
+    rect(1140,615,-3,-20);
+    rect(1140,615,-50,-3);
+    rect(0, time, width, 3);
+    if(time>height){
+      timereset=frameCount*2;
+    }
+    fill(0,255,255,100);
+    rect(125,500,300,100);
+    rect(825,500,300,100);
+  }else if(allState==41){
+    cardkosa=lerp(cardkosa,255,0.01);
+    fill(100,100,100,cardkosa);
+    stroke(225,225,225,cardkosa);
+    strokeWeight(2);
+    rect(425,50,400,600);
+    fill(0,0,0,cardkosa);
+    text(allCards[gatya1][0],430,80,5);
+  }else if(allState==42){
+    cardkosa=lerp(cardkosa,255,0.01);
+    fill(100,100,100,cardkosa);
+    stroke(225,225,225,cardkosa);
+    strokeWeight(2);
+    for(int i=0;i<5;i++){
+      rect(250*i+10,15,180,270);
+      int A=gatya10[i];
+      textSize(15);
+      fill(0,0,0,cardkosa);
+      text(allCards[A][0],250*i+11,30);
+      fill(100,100,100,cardkosa);
+    }
+    for(int j=0;j<5;j++){
+      rect(250*j+10,300,180,270);
+      int A=gatya10[j+5];
+      textSize(15);
+      fill(0,0,0,cardkosa);
+      text(allCards[A][0],250*j+11,315);
+      fill(100,100,100,cardkosa);
+    }
+  }
+  
+  
+  
+  
+  
   if (allState == 3) {
     colorMode(RGB, 255, 255, 255);
     //色を付けました
@@ -709,4 +773,16 @@ void resetBattle() {
   battleLog.clear();
   // 戦闘状態
   fightState = 1;
+}
+
+void mouseClicked(){
+  if(allState==4 && mouseX>125 && mouseX<425 && mouseY>500 && mouseY<600){
+    gatya1=int(random(5));
+    allState=41;
+  }else if(allState==4 && mouseX>825 && mouseX<1125 && mouseY>500 && mouseY<600){
+    for(int i=0; i<10; i++){
+      gatya10[i]=int(random(5));
+    }
+    allState=42;
+  }
 }
