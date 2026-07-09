@@ -1,6 +1,8 @@
-
+Souko souko;
 //ステート３関係のやつです
-int totalCards = 20;
+int draggingIndex = -1;
+//ドラッグ中のカードを記憶
+int totalCards = 200;
 boolean[] Dragging = new boolean[totalCards];
 float[] cardX = new float [totalCards];
 float[] cardY = new float [totalCards];
@@ -9,7 +11,13 @@ float[] startY = new float[totalCards];
 
 //編成したカードのデータを保存する関係です
 int[] cardData = new int[totalCards];
-int[] deckSlots = {-1, -1, -1, -1, -1};
+int[] cardRestDurability = new int[totalCards];
+//デッキ編成を２０枚へ
+int[] deckSlots = new int[20];
+// 倉庫のスクロール位置を記憶します
+float scrollY = 0;
+//選択されたカードを右画面に表示するためにクリックされたカードを記憶します
+int selectedCard = -1;
 //ここまでステート３関係のやつです
 
 
@@ -78,18 +86,35 @@ void setup() {
   addCards(4, 4);
 
   // ステート３のやつです
+  souko = new Souko();
+  //編成スロットを全て空にする処理
+  for (int slot = 0; slot <20; slot++) {
+    deckSlots[slot] = -1;
+  }
+
   int cardCount = 0;
-  for ( int tate = 0; tate < 4; tate++) {
+  int boxW = 80;
+  int boxH = 80;
+  int activeCardW = 55;
+  int activeCardH = 70;
+
+  //縦に４０列作ります 5×40 = 200
+
+  for ( int tate = 0; tate < 40; tate++) {
     for ( int yoko = 0; yoko < 5; yoko++) {
-      startX[cardCount] = 100 + (yoko * 180)+12;
-      startY[cardCount] = 305 + (tate * 100);
+
+      startX[cardCount] = (100 + (yoko * 180)) + (boxW /2) - ( activeCardW / 2);
+      startY[cardCount] = (380 + (tate * 100)) + (boxH /2) - ( activeCardH /2);
+
       cardX[cardCount] = startX[cardCount];
       cardY[cardCount] = startY[cardCount];
       Dragging[cardCount] = false;
 
-      //カードの種類をゼロから４までで覚えさせる
-      cardData[cardCount] = tate ;
-      if (tate == 3 && yoko == 4) cardData[cardCount] = 4 ;
+      //200枚のカードそれぞれに０－４のカードIDを割り当て
+      int cId = cardCount %5;
+      cardData[cardCount] = cId;
+      //カード毎に残り使用回数を付与
+      cardRestDurability[cardCount] = int(allCards[cId][durability]);
       cardCount++;
     }
   }
@@ -101,26 +126,57 @@ void draw() {
 
   //image(img,0,0,width,height);//仮で背景表示してません
   if (allState == 3) {
-   //色を付けました
-    background(0,100,100);
-    fill(0,50,100);
-    rect(0,0,80,700);
-    rect(width-80,0,80,700);
+    colorMode(RGB, 255, 255, 255);
+    //色を付けました
+    background(0, 100, 100);
+    fill(0, 50, 100);
+    rect(0, 0, 80, 700);
+    rect(width-80, 0, 80, 700);
 
 
 
-    int y = 50;
     int cardWidth = 150;
-    int cardHeigtht = 220;
-    fill(240);
-    stroke(0);
-    for ( int x = 100; x < 1000; x += 180) {
-      rect( x, y, cardWidth, cardHeigtht, 7);
+    int cardHeigtht = 65;
+
+    for ( int tate = 0; tate < 4; tate++) {
+      for ( int yoko = 0; yoko < 5; yoko++) {
+        int slot = tate*5+yoko;
+        int targetX = 100 + ( yoko * 180);
+        int targetY = 30 + ( tate * 75);
+
+        //色を付けます　主に編成欄
+        if (deckSlots[slot] != -1) {
+          //編成欄にカードが入っている場合、そのカードと同じ感じで
+          colorMode(HSB, 360, 100, 100);
+          int cardId = deckSlots[slot];
+          fill((cardId * 72) % 360, 60, 95);
+        } else {
+          //編成欄が空っぽ
+          colorMode(RGB, 255, 255, 255);//通常モード
+          fill(240);
+        }
+
+        stroke(0);
+        rect(targetX, targetY, cardWidth, cardHeigtht, 7);
+
+        colorMode(RGB, 255, 255, 255);
+        if (deckSlots[slot] != -1) {
+          fill(0);
+          textSize(11);
+          int actualCardId = cardData[deckSlots[slot]];
+          text(allCards[actualCardId][cardName], targetX + 8, targetY + cardHeigtht/2 + 5);
+        } else {
+          fill(130);
+          textSize(13);
+          text("Slot" + (slot + 1), targetX + 12, targetY + cardHeigtht/2 + 5);
+        }
+      }
     }
+
     int boxWidth = 80;
     int boxHeight= 80;
     fill(255);
-    for ( int rowY = 300; rowY <= 600; rowY += 100) {
+    for ( int rowY = 380; rowY <= 680; rowY += 100) {
       for ( int x = 100; x < 1000; x += 180) {
         rect ( x, rowY, boxWidth, boxHeight, 7);
       }
@@ -131,17 +187,118 @@ void draw() {
 
     colorMode( HSB, 360, 100, 100);
     for ( int i = 0; i < totalCards; i++) {
+      //カードが編成欄に入っているかどうかを調べる
+      int assignedSlot = -1;
+      for (int slot = 0; slot < 20; slot++) {
+        if (deckSlots[slot] == i) {
+          assignedSlot = slot;
+          break;
+        }
+      }
       if ( Dragging[i]) {
         cardX[i] = mouseX - (activeCardW/2);
         cardY[i] = mouseY - (activeCardH/2);
+      } else {
+        //boolean inSlot = false;
+        //for (int slot = 0; slot < 20; slot++) {
+        if (assignedSlot != -1) {
+          int slotYoko = assignedSlot % 5;
+          int slotTate = assignedSlot /5;
+          cardX[i] = 100 + (slotYoko * 180) + (150/2) - (activeCardW/2);
+          cardY[i] = 30 + (slotTate * 75) + (65/2) - (activeCardH/2);
+        } else {
+          //スロットに入っていない　倉庫になるなら
+          cardX[i] = startX[i];
+          cardY[i] = startY[i] + scrollY;
+        }
       }
-      fill((i*24)%360, 80, 90);
+      //白い枠も動かそう
+      if (assignedSlot == -1) {
+        //
+        if ( cardY[i] >= 380) {
+          colorMode( RGB, 255, 255, 255);
+          fill(255);
+          stroke(0);
+          strokeWeight(1);
+
+          //
+          float boxX = cardX[i] - (boxWidth - activeCardW) / 2.0;
+          float boxY = cardY[i] - (boxHeight - activeCardH) / 2.0;
+
+          rect ( boxX, boxY, boxWidth, boxHeight, 7);
+        }
+      }
+      //掴んでいなくて、かつ倉庫の境界線を（Y３８０）を越えたら非表示
+      if (!Dragging[i] ) {
+        //ただし編成欄にはいっているものは上に表示したいのでスロット済みの物は除外
+        if (assignedSlot == -1 && cardY[i]  < 380) {
+
+          continue;
+        }
+      }
+      colorMode(HSB, 360, 100, 100);
+      int cId = cardData[i];
+      fill((cId*72)% 360, 80, 90);
+      //選択されているなら　ハイライトする
+      if ( i == selectedCard) {
+        stroke(60, 100, 100);
+        strokeWeight(3);
+      } else {
+        stroke(0);
+        strokeWeight(1);
+      }
       rect( cardX[i], cardY[i], activeCardW, activeCardH, 7);
     }
 
+    strokeWeight(1);
     colorMode( RGB, 255, 255, 255);
-    fill(255);
+
+    //詳細表示欄の関係です
+    if (selectedCard != -1) {
+      int cId = cardData[selectedCard];
+      //int rD = cardRestDurability[selectedCard];
+
+      colorMode(RGB, 255, 255, 255);
+      fill(255, 255, 0);
+      textSize(20);
+
+      //詳細表示欄の位置はここで変えてね！
+      int textX = 1000;
+      int textY = 100;
+
+      rect(textX-15, textY-35, 265, 310, 7);
+
+      colorMode(RGB, 255, 255, 255);
+      fill(0);
+      textSize(20);
+
+      rect(textX-10, textY-30, 255, 300, 7);
+
+      colorMode(RGB, 255, 255, 255);
+      fill(255);
+      textSize(20);
+
+      text("【選択中のカード】", textX, textY);
+      text("名前:" + allCards[cId][cardName], textX, textY + 25);
+      text("タイプ:" + allCards[cId][cardType], textX, textY + 50);
+      text("効果値:" + allCards[cId][value], textX, textY + 75);
+      text("消費EP:" + allCards[cId][consumption], textX, textY + 100);
+      text("耐久度:" + cardRestDurability[selectedCard] + "/" + allCards[cId][durability], textX, textY + 125);
+
+      //説明文が長い場合は小さくするか折り返す
+      textSize(15);
+      text("説明:" + allCards[cId][description], textX, textY + 160, 220, 100);
+    }
+    if (draggingIndex != -1) {
+      colorMode(HSB, 360, 100, 100);
+      int cId = cardData[draggingIndex];
+      fill((cId * 72) % 360, 80, 90);
+      stroke(0);
+      rect(cardX[draggingIndex], cardY[draggingIndex], activeCardW, activeCardH, 7);
+    }
   }
+
+
 
   // int kirikaeA=0;
   //int kirikaeB=0;
@@ -372,24 +529,36 @@ void keyPressed() {
 //ステート３のやつです
 void mousePressed() {
   if (allState == 3) {
+
+    int activeCardW = 55;
+    int activeCardH = 70;
+
+    boolean cardPressed = false;
+
     for ( int i = 0; i < totalCards; i++) {
-      if (mouseX >= cardX[i] && mouseX <= cardX[i] + 55 && mouseY >= cardY[i] && mouseY <= cardY[i] + 70) {
+      if (mouseX >= cardX[i] && mouseX <= cardX[i] + activeCardW && mouseY >= cardY[i] && mouseY <= cardY[i] + activeCardH) {
         Dragging[i] = true;
-        // 編成したカードを外したときにデータを消すやつ
-        if (cardY[i] == 125) {
+        draggingIndex = i;
+        //カードの詳細を表示します
+        selectedCard  = i;
+        cardPressed = true;
+        //// 編成したカードを外したときにデータを消すやつ
+        //if (cardY[i] == 125) {
 
-          for ( int slot = 0; slot < 5; slot++) {
-            int targetX = 100 + ( slot * 180);
-            float targetXCenter = targetX + (150/2) - ( 55/2);
-            if ( cardX[i] == targetXCenter) {
-              deckSlots [slot] = -1;
-            }
-          }
+        //for ( int slot = 0; slot < 20; slot++) {
+        //  //float sX = 100 + ( slot % 5 * 180);
+        //  //float sY = 30 + (slot / 5 * 75) + (65/2) - (activeCardH/2) ;
+        ////  if (deckSlots[slot] == i ) {
+        ////    deckSlots [slot] = -1;
+        //  }
+        //}
 
-
-          break;
-        }
+        break;
       }
+    }
+    //もしカードが押されてないなら詳細表示欄を消す
+    if (!cardPressed) {
+      selectedCard = -1;
     }
   }
 }
@@ -405,24 +574,44 @@ void mouseReleased() {
         Dragging[i] = false;
         boolean placed = false;
 
-        for ( int slot = 0; slot < 5; slot++) {
-          int targetX = 100 + (slot * 180);
-          int targetY = 50;
+        //このカードのもともとどこのスロットにいたかを確認
+        int oldSlot = -1;
+        for ( int slot = 0; slot < 20; slot++) {
+          if ( deckSlots[slot] == i) {
+            oldSlot = slot;
+            break;
+          }
+        }
 
-          if ( mouseX >= targetX && mouseX <= targetX + 150 && mouseY >= 50 && mouseY <= 220) {
-            float  newX = targetX + (150/2) - (activeCardW / 2);
-            float newY = targetY + (220 / 2) - (activeCardH / 2);
-            for ( int kasanari = 0; kasanari < totalCards; kasanari++ ) {
-              if ( i != kasanari && cardX[kasanari] == newX && cardY[kasanari] == newY) {
-                cardX[kasanari]=startX[kasanari];
-                cardY[kasanari] = startY[kasanari];
+
+        //マウスが離されたスロットの判定
+        for ( int slot = 0; slot < 20; slot++) {
+          int slotYoko = slot % 5;
+          int slotTate = slot /5;
+          int targetX = 100 + (slotYoko * 180);
+          int targetY = 30 + (slotTate * 75);
+
+          if ( mouseX >= targetX && mouseX <= targetX + 150 && mouseY >= targetY && mouseY <= targetY + 65) {
+            int HenseiCardIndex = deckSlots[slot];
+            if ( HenseiCardIndex != -1 && HenseiCardIndex != i) {
+              float newX = 100 + (slotYoko * 180) + (150/2) - (activeCardW/2);
+              float newY = 30  + ( slotTate * 75) + (65/2)  - (activeCardH/2);
+
+              for ( int kasanari = 0; kasanari < totalCards; kasanari++ ) {
+                if ( i != kasanari && cardX[kasanari] == newX && cardY[kasanari] == newY) {
+                  cardX[kasanari]=startX[kasanari];
+                  cardY[kasanari] = startY[kasanari];
+                }
               }
+              cardX[HenseiCardIndex] = startX[HenseiCardIndex];
+              cardY[HenseiCardIndex]=  startY[HenseiCardIndex];
             }
-            cardX[i]=newX;
-            cardY[i]=newY;
+            deckSlots[slot] = i;
 
-            //リリースされたスロット番号にそのカードのデータを保存します
-            deckSlots[slot] = cardData[i];
+            //別のスロットにいったなら古い編成データを消す
+            if (oldSlot != -1 && oldSlot != slot) {
+              deckSlots[oldSlot] = -1;
+            }
 
             placed = true;
             break;
@@ -431,10 +620,28 @@ void mouseReleased() {
 
         if (!placed) {
           cardX[i] = startX[i];
-          cardY[i] = startY[i];
+          cardY[i] = startY[i] + scrollY;
+
+          if (oldSlot != -1) {
+            deckSlots[oldSlot] = -1;
+          }
         }
       }
     }
   }
+  draggingIndex = -1;
 }
+
+//マウスホイールのイベントコードだよ
+void mouseWheel(MouseEvent event) {
+  if (allState == 3) {
+    //下にホイールを動かせば＋、上にすれば－の値をゲット
+    float e = event.getCount();
+    //スクロールスピードを２５ＰＸに
+    scrollY -= e*25;
+    //倉庫の２００枚の壁を抜けないようにブレーキを
+    scrollY = constrain(scrollY, -3300, 0);
+  }
+}
+
 //ここまでステート３です
