@@ -564,7 +564,6 @@ void mousePressed() {
 }
 
 
-
 void mouseReleased() {
   if (allState == 3) {
     int activeCardW = 55;
